@@ -1,11 +1,11 @@
-#Initial script created by Arthur Elmes, with significant contributions from
-#A.J. Shatz, based on methods of Jimenez-Munoz et al.
+# Initial script created by Arthur Elmes, with significant contributions from
+# A.J. Shatz, based on methods of Jimenez-Munoz et al.
 
-#This thing needs to be really reworked, ideally abandoning arcpy in favor of
-#gdal or rasterio, and better yet made into a module so the functions can be
-#invoked as-needed, rather than as a big waterfall
+# This thing needs to be really reworked, ideally abandoning arcpy in favor of
+# gdal or rasterio, and better yet made into a module so the functions can be
+# invoked as-needed, rather than as a big waterfall
 
-#import stuff
+# import stuff
 import os
 import shutil
 import arcpy
@@ -23,25 +23,26 @@ print "Processing started: ",
 print datetime.datetime.now()
 startTime = datetime.datetime.now()
 
-#Check out spatial analyst license (why?)
+# Check out spatial analyst license (why?)
 arcpy.CheckOutExtension("Spatial")
 
-#set directories
-#the 'test' directories are all identical, but are on D instead of G
+# set directories
+# the 'test' directories are all identical, but are on D instead of G
 
-workingFolder = "D:\\Data\\Dissertation\\LandsatDataWorcester\\AddDates" #G:\\Data\\Dissertation\\LandsatDataWorcester\\"
+workingFolder = "D:\\Data\\Dissertation\\LandsatDataWorcester\\AddDates" # G:\\Data\\Dissertation\\LandsatDataWorcester\\"
 cdrDownloadFolder = os.path.join(workingFolder, "OriginalDLFolder\\CDR") 
 cdrPathRowFolder = os.path.join(workingFolder, "CDR") 
-lvl1DownloadFolder = os.path.join(workingFolder, "OriginalDLFolder\\LVL1")  #"F:\\Data\\Dissertation\\LandsatDataWorcester\\LVL1" #os.path.join(workingFolder, "LVL1") 
-pathRowList = ["012031", "013030", "013031"] #might add to these if necessary
+lvl1DownloadFolder = os.path.join(workingFolder, "OriginalDLFolder\\LVL1")  # "F:\\Data\\Dissertation\\LandsatDataWorcester\\LVL1" #os.path.join(workingFolder, "LVL1")
+pathRowList = ["012031", "013030", "013031"] # might add to these if necessary
 tileFolderRoot = workingFolder + "\\CDR\\" 
 env.overwriteOutput = True
 env.workspace = tileFolderRoot 
 tileFolder = env.workspace
 
-#this is the list of rasters that, for whatever reason, fail to be correctly processed
+# this is the list of rasters that, for whatever reason, fail to be correctly processed
 errorListLocation = "D:\\sync\\gis\\Dissertation\\scripts\\ErrorList.txt"
-#clear any rasters from previous run
+
+# clear any rasters from previous run
 errorList = open(errorListLocation, "w")
 
 '''
@@ -97,8 +98,8 @@ for folder in os.listdir(cdrPathRowFolder):
                                 print "Moving: " + os.path.join(root, lvl1Image) + " to " + os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image)
 
 '''
-#iterate through each band in the folder, and assign raster objects to the cloud mask,
-#NIR, and red bands
+# iterate through each band in the folder, and assign raster objects to the cloud mask,
+# NIR, and red bands
 
 
 try:
@@ -143,8 +144,9 @@ try:
                     errorList.write("NDVI calculation fail: " + str(nirBand))
                     errorList.close()
 
-                #take the mask and create a binary mask to remove all snow, cloud, cloud shadow, and water. Store the remap values in a variable called remapKey
-                #remapKey = RemapValue([[0,1],[1,"NODATA"],[2,"NODATA"],[3,"NODATA"],[4,"NODATA"]])
+                # take the mask and create a binary mask to remove all snow, cloud, cloud shadow, and water.
+                # Store the remap values in a variable called remapKey
+                # remapKey = RemapValue([[0,1],[1,"NODATA"],[2,"NODATA"],[3,"NODATA"],[4,"NODATA"]])
                 try:
                     remapKey = RemapValue([[2,1],[3,1],[4,1]])
                     cloudMaskBin = Reclassify(cloudMaskOrig, "Value", remapKey) 
@@ -166,9 +168,8 @@ except:
     print "Could not process: ",
     print str(tile)
 
-
                 
-#this deletes any previously made rasters, just so no duplicates are made
+# this deletes any previously made rasters, just so no duplicates are made
 def deleteRasters(currentFolder, currentFileList):
     env.workspace = currentFolder
     tempRasterList = arcpy.ListRasters("*","TIF")
@@ -179,13 +180,13 @@ def deleteRasters(currentFolder, currentFileList):
     del tempRasterList
 
 
-#these are the modeled radiosounding values from the JMS series of papers
+# these are the modeled radiosounding values from the JMS series of papers
 radiosoundDict = {'LT5':[[0.08735,-0.09553,1.10188],[-0.69188,-0.58185,-0.29887],[-0.03724,1.53065,-0.45476]],\
                   'LE7':[[0.07593,-0.07132,1.08565],[-0.61438,-0.70916,-0.19379],[-0.02892,1.46051,-0.43199]],\
                   'LC8':[[0.04019,0.02916,1.01523],[-0.38333,-1.50294,0.20324],[0.00918,1.36072,-0.27514]]}
 
-#This function calculates at sensor radiance by multiplying the image by the gain and adding the bais.
-#These items are retrieved from the mtl metadata file.
+# This function calculates at sensor radiance by multiplying the image by the gain and adding the bais.
+# These items are retrieved from the mtl metadata file.
 def lSen(thermalImageFolder, thermalImage, metaFile):
     imageName = str(thermalImage)
     metaFilePath = ""
@@ -219,7 +220,7 @@ def lSen(thermalImageFolder, thermalImage, metaFile):
                         bias = float(str.split(line)[2])
         try:
             lSenRaster = bias + Raster(thermalImageFolder + "\\" + imageName) * gain
-            #print thermalImageFolder + "\\" + imageName[:-4] + "_lSen.TIF"
+            # print thermalImageFolder + "\\" + imageName[:-4] + "_lSen.TIF"
             lSenRaster.save(thermalImageFolder + "\\" + imageName[:-4] + "_lSen.TIF")       
             return lSenRaster.path + lSenRaster.name
         except:
@@ -228,8 +229,8 @@ def lSen(thermalImageFolder, thermalImage, metaFile):
             errorList.close()
             
     return lSenRaster
-    del lSenRaster
-        
+
+
 def tSen(lSenRasterFolder, lSenRaster):
     try:
         env.workspace = lSenRasterFolder
@@ -267,20 +268,18 @@ def gammaDelta(currentFolder, tSenRaster, lSenRaster):
         tSenRasterName = str(tSenRaster)
         lamb = 0.0
         if len(str(tSenRasterName)) > 0 and "None" not in tSenRasterName:
-            #these lambda coefficients are taken from Jimenez et al 2003, 2009, and 2014
-            #check the lambdas for units -- AJ's were two orders smaller
-            #I actually made these two orders of magnitude bigger than JMS
+            # these lambda coefficients are taken from Jimenez et al 2003, 2009, and 2014
+            # check the lambdas for units -- AJ's were two orders smaller
+            # I actually made these two orders of magnitude bigger than JMS
             if "LT5" in tSenRasterName:
                 lamb = 125600
             elif "LE7" in tSenRasterName:
                 lamb = 127700
             elif "LC8" in tSenRasterName:
                 lamb = 132400
-            #calculate gamma and delta, as defined by Jimenez et al 2003, 2009, and 2014  
+            # calculate gamma and delta, as defined by Jimenez et al 2003, 2009, and 2014
             gammaRaster = arcpy.sa.Power(tSenRaster, 2) / lamb * Raster(lSenRaster)
             deltaRaster = Raster(tSenRaster) - arcpy.sa.Power(tSenRaster, 2) / lamb
-            #print str(tSenRasterName)[:-9] + "gamma.TIF"
-            #print str(tSenRasterName)[:-9] + "delta.TIF"
             gammaRaster.save(str(tSenRasterName)[:-9] + "gamma.TIF")
             deltaRaster.save(str(tSenRasterName)[:-9] + "delta.TIF")
             return gammaRaster.name, deltaRaster.name
@@ -295,8 +294,8 @@ def gammaDelta(currentFolder, tSenRaster, lSenRaster):
         errorList.close()
         
 def emissivity(currentFolder, ndvi):
-    #print "Calculating emissivity for: ",
-    #print ndvi
+    # print "Calculating emissivity for: ",
+    # print ndvi
     try:
         env.workspace = currentFolder
         ndviRasterName = str(ndvi)
@@ -309,26 +308,26 @@ def emissivity(currentFolder, ndvi):
             if "_binary.tif" in band:
                 maskBand = arcpy.Raster(band)
         if len(ndviRasterName) > 0 and "None" not in ndviRasterName:
-            #reclasfiy the NDVI image to emissivity based on Sobrino et al 2004 thresholds of
-            #<0.2 for bare soil, >0.5 for fully vegetated, and 0.2<NDVI<0.5 being a mixed pixel
-            #LSE values also came from Sobrino et al 2004
-            #This needs to be reworked -- the MXD on the desktop has the correct steps
-            #Basically the emissivity raster will be created by raster adding three rasters
-            #First CON the soil and veg emissivity rasters: NDVI < 0.2 = emis 0.973; NDVI> 0.5 = emis 0.99
-            #for all other cases, reclass to 0
-            #Then CON the mixed soil/veg emis by including a conditoinal that only calculates new emis values
-            #when NDVI are within the range, otherwise reclass to 0
-            #This should yeild three interlocking rasters, which can just be added together for final emissivity.
+            # reclasfiy the NDVI image to emissivity based on Sobrino et al 2004 thresholds of
+            # <0.2 for bare soil, >0.5 for fully vegetated, and 0.2<NDVI<0.5 being a mixed pixel
+            # LSE values also came from Sobrino et al 2004
+            # This needs to be reworked -- the MXD on the desktop has the correct steps
+            # Basically the emissivity raster will be created by raster adding three rasters
+            # First CON the soil and veg emissivity rasters: NDVI < 0.2 = emis 0.973; NDVI> 0.5 = emis 0.99
+            # for all other cases, reclass to 0
+            # Then CON the mixed soil/veg emis by including a conditoinal that only calculates new emis values
+            # when NDVI are within the range, otherwise reclass to 0
+            # This should yeild three interlocking rasters, which can just be added together for final emissivity.
             vegEmisRst = arcpy.sa.Con(ndviRasterName, 0.99, 0, "VALUE >= 0.5")
             soilEmisRst = arcpy.sa.Con(ndviRasterName, 0.973, 0, "VALUE <= 0.2")
             mixedEmisRst = arcpy.sa.Con(ndviRasterName, 0.004 * arcpy.sa.Power((Raster(ndviRasterName) - 0.2/0.5-0.2),2) + 0.986, 0, "VALUE > 0.2 AND VALUE < 0.5")   
             combinedEmisRst = mixedEmisRst + soilEmisRst + vegEmisRst
-            #combinedEmisRst = combinedEmisRst * maskBand
+            # combinedEmisRst = combinedEmisRst * maskBand
             combinedEmisRst = arcpy.sa.Con(maskBand, combinedEmisRst, -999, "value = 0")
             print str(ndviRasterName[:-14] + "_emissivity_SA.TIF")
             combinedEmisRst.save(str(ndviRasterName[:-14] + "_emissivity_SA.TIF"))
         return combinedEmisRst.path + combinedEmisRst.name
-        del combinedEmisRst, vegEmisRst, mixedEmisRst, soilEmisRst, maskEmisRst
+
     except:
         print arcpy.AddError(arcpy.GetMessages(2))
         print "Could not calculate emissivity for: ",
@@ -337,7 +336,7 @@ def emissivity(currentFolder, ndvi):
         errorList.write("emissivity calculation fail, substituted placeHolderRst: " + str(ndvi))
         errorList.close()
         placeHolderRst = arcpy.Raster("G:\\Data\\Dissertation\\LandsatDataWorcester\\PlaceHolderRaster\\PlaceHolder_AllNoData.tif")
-        #placeHolderRst.save(os.path.join(currentFolder, currentFolder[-33:-17] + "_emissivity_SA.TIF"))
+        # placeHolderRst.save(os.path.join(currentFolder, currentFolder[-33:-17] + "_emissivity_SA.TIF"))
         imageNameList = currentFolder.split(os.sep)
         imageName = imageNameList[len(imageNameList) - 1]
         placeHolderRstSavePath = os.path.join(currentFolder, imageName + "_emissivity_SA.TIF")
@@ -345,13 +344,10 @@ def emissivity(currentFolder, ndvi):
         print "Placeholder saved: ",
         print placeHolderRstSavePath
         return placeHolderRstSavePath
-        del placeHolderRstSavePath, imageName, imageNameList
-        #print placeHolderRst.path + placeHolderRst.name
-        
 
 def w(currentImage):
-    #retrieve the relative humidity value fom the worksheet defined below,
-    #which contains the metadata for calculation and data sources
+    # retrieve the relative humidity value fom the worksheet defined below,
+    # which contains the metadata for calculation and data sources
     imageDate = str(currentImage)[9:16]
     relHum = 0.0
     with open(r"D:\sync\gis\Dissertation\scripts\Thermal\WeatherDataWorcester.csv", "rb") as csvfile:
@@ -365,7 +361,7 @@ def w(currentImage):
 def psi123(radiosoundDict, w, thermalBand):
     psi = []
     if len(str(thermalBand)) > 0:
-        #coefs = [[1],[w],[w**2]]
+        # coefs = [[1],[w],[w**2]]
         coefs = [[w**2],[w],[1]]
         coefMatrix = np.matrix(coefs)
         sens = str(thermalBand)[0:3]
@@ -379,10 +375,10 @@ def lst(currentFolder, lSenRaster, gammaDeltaList, emisRaster, psiValues):
         env.workspace = currentFolder
         lstRaster = arcpy.sa.Con(emisRaster, arcpy.sa.Float(Raster(gammaDeltaList[0]) * (1/Raster(emisRaster)\
                     * (float(psiValues[0]) * (Raster(lSenRaster) * 0.1) + float(psiValues[1])) + float(psiValues[2])) + Raster(gammaDeltaList[1])), -999, "value > -999")
-        #lstRaster.save("D:\\Data\\Dissertation\\LandsatDataWorcester\\LST_Run3\\" + str(lSenRaster[-36:-8]) + "lst.TIF")
-        #lstRaster.save("D:\\Data\\Dissertation\\LandsatDataWorcester\\LST_Run3\\" + lSenRaster.name[:-8] + "lst.TIF")
+        # lstRaster.save("D:\\Data\\Dissertation\\LandsatDataWorcester\\LST_Run3\\" + str(lSenRaster[-36:-8]) + "lst.TIF")
+        # lstRaster.save("D:\\Data\\Dissertation\\LandsatDataWorcester\\LST_Run3\\" + lSenRaster.name[:-8] + "lst.TIF")
 
-        #get the correct image name from the current folder name, minus the CDR-specific gobldegook.
+        # get the correct image name from the current folder name, minus the CDR-specific gobldegook.
         imageNameList = currentFolder.split(os.sep)
         imageName1 = imageNameList[len(imageNameList) - 1]
         imageName2 = imageName1.split("-")
@@ -395,7 +391,7 @@ def lst(currentFolder, lSenRaster, gammaDeltaList, emisRaster, psiValues):
         print "Saving LST to: ",
         print lstRasterSavePath
         lstRaster.save(lstRasterSavePath)
-        #lstRaster.save(str(lSenRaster + "_lst.TIF"))
+        # lstRaster.save(str(lSenRaster + "_lst.TIF"))
         del lstRaster, gammaDeltaList, emisRaster, psiValues, lstRasterSavePath, imageNameList, imageName1, imageName2, imageName3
 
     except:
@@ -406,7 +402,7 @@ def lst(currentFolder, lSenRaster, gammaDeltaList, emisRaster, psiValues):
         errorList.close()
 
 
-#Mask the lst and NDVI images
+# Mask the lst and NDVI images
 def maskBands(currentFolder, currentFileList):
     env.workspace = currentFolder
     bandList = arcpy.ListRasters("*", "TIF")
@@ -421,7 +417,7 @@ def maskBands(currentFolder, currentFileList):
                 toMask = arcpy.Raster(bandToMask)
                 print  bandToMask
                 maskedBand = arcpy.sa.Con(maskBand, toMask, "-999", "Value = 0")
-                #maskedBand = toMask * maskBand
+                # maskedBand = toMask * maskBand
                 maskedBand.save(toMask.name[:-4]  + "_Masked.tif")
                 del toMask
         elif "NDVI" in bandToMask and "emissivity" not in bandToMask:
@@ -429,14 +425,14 @@ def maskBands(currentFolder, currentFileList):
                 print "Masking image: "
                 toMask = arcpy.Raster(bandToMask)
                 print  bandToMask
-                #maskedBand = toMask * maskBand
+                # maskedBand = toMask * maskBand
                 maskedBand = arcpy.sa.Con(maskBand, toMask, "-999", "Value = 0")
                 maskedBand.save(toMask.name[:-4] + "_Masked.tif")
-                #arcpy.Delete_management(bandToMask)
+                # arcpy.Delete_management(bandToMask)
                 del toMask
     del maskBand
 
-#delete all _SA bands except *lst and *ndvi
+# delete all _SA bands except *lst and *ndvi
 def cleanUp(currentFolder):
     if len(str(currentFolder)) > 0:
         arcpy.workspace = currentFolder
@@ -447,6 +443,7 @@ def cleanUp(currentFolder):
                 print rasters
                 arcpy.Delete_management(rasters)
         del tempRasterList
+
 '''   
 #delete any previously-made rasters -- careful, this will delete any of the JMS intermediate rasters, as well as the LST
 for root, dirs, files in os.walk(tileFolderRoot):
@@ -460,7 +457,7 @@ for root, dirs, files in os.walk(tileFolderRoot):
         errorList.close()
  '''       
     
-#mask the rasters with the cloudmask
+# mask the rasters with the cloudmask
 for root, dirs, files in os.walk(tileFolderRoot):
     try:
         maskBands(root, files)
@@ -472,8 +469,8 @@ for root, dirs, files in os.walk(tileFolderRoot):
         errorList.close()
 
 
-#Extract the study area raw data based on the 2012 quarantine zone shapefile
-#ACTUALLY I CHANGED THIS TO THE DISSOLVED 5 TOWN SA
+# Extract the study area raw data based on the 2012 quarantine zone shapefile
+# ACTUALLY I CHANGED THIS TO THE DISSOLVED 5 TOWN SA
 for tile in os.listdir(tileFolderRoot):
     for sensor in os.listdir(os.path.join(tileFolderRoot, tile)):
         for image in os.listdir(os.path.join(tileFolderRoot, tile, sensor)):
@@ -483,7 +480,7 @@ for tile in os.listdir(tileFolderRoot):
                 bandList = arcpy.ListRasters("*", "TIF")
                 extractedRaster = ""
                 fcTownsSA = "D:\\sync\\gis\\Dissertation\\StudyArea\\StudyAreaDatabase.gdb\\SAExtractionPolygon"
-                #fcQuarZone = "D:\\sync\\gis\\Dissertation\\StudyArea\\StudyAreaDatabase.gdb\\ALBQUarantineWorcester_USDA_20120101"
+                # fcQuarZone = "D:\\sync\\gis\\Dissertation\\StudyArea\\StudyAreaDatabase.gdb\\ALBQUarantineWorcester_USDA_20120101"
                 for band in bandList:
                     if len(str(band)) > 0 and "None" not in band:
                         if "_SA" not in band:
@@ -499,7 +496,7 @@ for tile in os.listdir(tileFolderRoot):
                 errorList.close()
                 
        
-#Loop through the sorted imagery folders (tiles) and do all the thermal calculations in sequence
+# Loop through the sorted imagery folders (tiles) and do all the thermal calculations in sequence
 for tile in os.listdir(tileFolderRoot):
     for sensor in os.listdir(os.path.join(tileFolderRoot, tile)):
         for image in os.listdir(os.path.join(tileFolderRoot, tile, sensor)):
@@ -538,8 +535,8 @@ for tile in os.listdir(tileFolderRoot):
             if len(str(thermalBand)) > 0:
                 if "012030" not in str(thermalBand):
                     try:
-                        #print "NDVI BAND IS: ",
-                        #print ndviBand
+                        # print "NDVI BAND IS: ",
+                        # print ndviBand
                         lSenRaster = lSen(imageFolder, thermalBand, metadataFile)
                         tSenRaster = tSen(imageFolder, lSenRaster)
                         gammaDeltaList = gammaDelta(imageFolder, tSenRaster, lSenRaster)
@@ -549,7 +546,7 @@ for tile in os.listdir(tileFolderRoot):
                         print "Calculating lst for : ",
                         print thermalBand
                         lstRaster = lst(imageFolder, lSenRaster, gammaDeltaList, emisRaster, psiValues)
-                        #cleanUp(imageFolder)
+                        # cleanUp(imageFolder)
                     except arcpy.ExecuteError:
                         print arcpy.AddError(arcpy.GetMessages(2))
                         print "Could not calculate LST for: ",
