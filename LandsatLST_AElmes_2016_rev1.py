@@ -1,3 +1,10 @@
+#Initial script created by Arthur Elmes, with significant contributions from
+#A.J. Shatz, based on methods of Jimenez-Munoz et al.
+
+#This thing needs to be really reworked, ideally abandoning arcpy in favor of
+#gdal or rasterio, and better yet made into a module so the functions can be
+#invoked as-needed, rather than as a big waterfall
+
 #import stuff
 import os
 import shutil
