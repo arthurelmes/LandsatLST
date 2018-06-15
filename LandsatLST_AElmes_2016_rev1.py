@@ -11,7 +11,7 @@ import shutil
 import arcpy
 from arcpy import env
 from arcpy.sa import *
-import win32com.client
+# import win32com.client
 import math
 import glob
 from glob import glob
@@ -19,6 +19,7 @@ import csv
 import numpy as np
 import datetime
 
+# print processing start time
 print "Processing started: ",
 print datetime.datetime.now()
 startTime = datetime.datetime.now()
@@ -29,148 +30,154 @@ arcpy.CheckOutExtension("Spatial")
 # set directories
 # the 'test' directories are all identical, but are on D instead of G
 
-workingFolder = "D:\\Data\\Dissertation\\LandsatDataWorcester\\AddDates" # G:\\Data\\Dissertation\\LandsatDataWorcester\\"
-cdrDownloadFolder = os.path.join(workingFolder, "OriginalDLFolder\\CDR") 
-cdrPathRowFolder = os.path.join(workingFolder, "CDR") 
-lvl1DownloadFolder = os.path.join(workingFolder, "OriginalDLFolder\\LVL1")  # "F:\\Data\\Dissertation\\LandsatDataWorcester\\LVL1" #os.path.join(workingFolder, "LVL1")
-pathRowList = ["012031", "013030", "013031"] # might add to these if necessary
-tileFolderRoot = workingFolder + "\\CDR\\" 
+working_folder = "C:\\Data\\Landsat"  # type: str
+refl_dl_folder = os.path.join(working_folder, "OriginalDLFolder\\Reflectance")
+lvl1_dl_folder = os.path.join(working_folder, "OriginalDLFolder\\LVL1")
+output_folder_root = os.path.join(working_folder, "Output")
+# DELETE?? refl_output_folder = os.path.join(working_folder, "Reflectance")
+
+# arcpy environment settings (blerg)
 env.overwriteOutput = True
-env.workspace = tileFolderRoot 
-tileFolder = env.workspace
+env.workspace = output_folder_root
+# DELETE??? tile_folder = env.workspace
+
+# list of path/row combos and sensors
+path_row_list = ["012031", "013030", "013031"]  # might add to these if necessary
+sensor_list = ["LT5", "LE7", "LC08"]
 
 # this is the list of rasters that, for whatever reason, fail to be correctly processed
-errorListLocation = "D:\\sync\\gis\\Dissertation\\scripts\\ErrorList.txt"
+error_list_location = "C:\\Data\\Landsat\\ErrorList.txt"
 
 # clear any rasters from previous run
-errorList = open(errorListLocation, "w")
+errorList = open(error_list_location, "w")
 
-'''
-#Loop through 'original' folder containting all LC8, LE7, and LT5 scenes from the CDR archive
-#Sort the raw download data into the appropriate folders, organized first by tile (path/row) then by sensor (LT5, LE7, or LC8)
-for pathRow in pathRowList:
-    for folder in os.listdir(cdrDownloadFolder):
-        tileName = str(folder)
-        if pathRow in tileName:
-            if "LC8" in tileName:
-                if os.path.isdir(os.path.join(tileFolderRoot + pathRow + "\\LC8\\" + tileName)):
-                    pass #print os.path.isdir(os.path.join(workingFolder, "tiles\\pr" + pathRow + "\\LC8\\" + tileName))
-                else:
-                    print "Moving Landsat 8 images: " + os.path.join(cdrDownloadFolder,folder) + " to: " + os.path.join(workingFolder, "tiles\\pr" + pathRow + "\\LC8\\" + tileName)
-                    shutil.copytree(os.path.join(cdrDownloadFolder,folder) , os.path.join(tileFolderRoot + pathRow + "\\LC8\\" + tileName))
-            elif "LE7" in tileName:
-                if os.path.isdir(os.path.join(tileFolderRoot + pathRow + "\\LE7\\" + tileName)):
-                    pass
-                else:
-                    print "Moving Landsat 7 images to: " + os.path.join(workingFolder, "tiles\\pr" + pathRow + "\\LE7\\" + tileName)
-                    shutil.copytree(os.path.join(cdrDownloadFolder, folder) , os.path.join(tileFolderRoot + pathRow + "\\LE7\\" + tileName))
-            elif "LT5" in tileName:
-                if os.path.isdir(os.path.join(tileFolderRoot + pathRow + "\\LT5\\" + tileName)):
-                    pass
-                else:
-                    print "Moving Landsat 5 images to: " + os.path.join(workingFolder, "tiles\\pr" + pathRow + "\\LT5\\" + tileName)
-                    shutil.copytree(os.path.join(cdrDownloadFolder, folder) , os.path.join(tileFolderRoot + pathRow + "\\LT5\\" + tileName))
 
-#Find the raw thermal band for each image
-#Loop through all CDR images, and for each one, loop through the LVL1 images, stopping at the matching image, based on name
-#Copy that image and paste it in the CDR folder
+# Loop through 'original' folder containing all LC8, LE7, and LT5 scenes from the CDR archive
+# Sort the raw download data into the appropriate folders, organized first by tile
+# (path/row) then by sensor (LT5, LE7, or LC8)
+def sort_images(lvl1_download_folder, refl_download_folder, refl_out_folder, pr_list, sns_list):
+    # First, create any pathrow folders needed in the output directory, based on the pr and sensor lists provided above
+    for pr in pr_list:
+        for sensor in sns_list:
+            out_dir = os.path.join(refl_out_folder, pr, sensor)
+            if not os.path.isdir(out_dir):
+                os.mkdir(out_dir)
 
-for folder in os.listdir(cdrPathRowFolder):
-    for sensor in os.listdir(os.path.join(cdrPathRowFolder, folder)):
-        for cdrImage in os.listdir(os.path.join(cdrPathRowFolder, folder, sensor)):
-            for root, dirs, files in os.walk(lvl1DownloadFolder):
-                for lvl1Image in files:
-                    #print cdrImage[:16] + "   " + lvl1Image
-                    if cdrImage[:16] in lvl1Image:
-                        #print cdrImage + " found: " + lvl1Image
-                        if "LC8" in lvl1Image:
-                            if "B10" in lvl1Image:
-                                print "Moving: " + os.path.join(root, lvl1Image) + " to " + os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image)
-                                shutil.copy2(os.path.join(root, lvl1Image), os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image))
-                            elif "MTL" in lvl1Image:
-                                shutil.copy2(os.path.join(root, lvl1Image), os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image))
-                        else:
-                            if "B6" in lvl1Image or "VCID" in lvl1Image:
-                                print "Moving: " + os.path.join(root, lvl1Image) + " to " + os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image)
-                                shutil.copy2(os.path.join(root, lvl1Image), os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image))
-                            elif "MTL" in lvl1Image:
-                                shutil.copy2(os.path.join(root, lvl1Image), os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image))
-                                print "Moving: " + os.path.join(root, lvl1Image) + " to " + os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image)
+    # Then, move the files into their correct folder
+    for img_folder in os.listdir(refl_download_folder):
+        tile_name = str(img_folder)
+        for pr in pr_list:
+            if pr in tile_name:
+                for sns in sns_list:
+                    if sns in tile_name:
+                        print tile_name, "is", sns, " and is in", pr
+                        shutil.copytree(os.path.join(refl_download_folder, tile_name), os.path.join(refl_out_folder, pr,
+                                                                                                    sns, tile_name))
+            
 
-'''
+# Find the raw thermal band for each image
+# Loop through all CDR images, and for each one, loop through the LVL1 images, stopping at the matching image, based on name
+# Copy that image and paste it in the CDR folder
+
+
+sort_images(lvl1_dl_folder, refl_dl_folder, output_folder_root, path_row_list, sensor_list)
+
+def find_thermal():
+    for folder in os.listdir(cdrPathRowFolder):
+        for sensor in os.listdir(os.path.join(cdrPathRowFolder, folder)):
+            for cdrImage in os.listdir(os.path.join(cdrPathRowFolder, folder, sensor)):
+                for root, dirs, files in os.walk(lvl1DownloadFolder):
+                    for lvl1Image in files:
+                        #print cdrImage[:16] + "   " + lvl1Image
+                        if cdrImage[:16] in lvl1Image:
+                            #print cdrImage + " found: " + lvl1Image
+                            if "LC8" in lvl1Image:
+                                if "B10" in lvl1Image:
+                                    print "Moving: " + os.path.join(root, lvl1Image) + " to " + os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image)
+                                    shutil.copy2(os.path.join(root, lvl1Image), os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image))
+                                elif "MTL" in lvl1Image:
+                                    shutil.copy2(os.path.join(root, lvl1Image), os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image))
+                            else:
+                                if "B6" in lvl1Image or "VCID" in lvl1Image:
+                                    print "Moving: " + os.path.join(root, lvl1Image) + " to " + os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image)
+                                    shutil.copy2(os.path.join(root, lvl1Image), os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image))
+                                elif "MTL" in lvl1Image:
+                                    shutil.copy2(os.path.join(root, lvl1Image), os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image))
+                                    print "Moving: " + os.path.join(root, lvl1Image) + " to " + os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image)
+
+
 # iterate through each band in the folder, and assign raster objects to the cloud mask,
 # NIR, and red bands
-
-
-try:
-    for tile in os.listdir(tileFolderRoot):
-        for sensor in os.listdir(os.path.join(tileFolderRoot, tile)):
-            for image in os.listdir(os.path.join(tileFolderRoot, tile, sensor)):
-                env.workspace = os.path.join(tileFolderRoot, tile, sensor, image)
-                imageFolder = os.path.join(tileFolderRoot, tile, sensor, image)
-                bandList = arcpy.ListRasters("*", "TIF")
-                for band in bandList:
-                    if "LC8" in band:
-                        if "band4" in band:
-                            redBand = arcpy.Raster(imageFolder + "\\" + band)
-                        elif "band5" in band:
-                            nirBand = arcpy.Raster(imageFolder + "\\" + band)
-                        elif "cfmask.tif" in band:
-                            cloudMaskOrig = arcpy.Raster(imageFolder + "\\" + band)
-                    elif "LE7" in band:
-                        if "band3" in band:
-                            redBand = arcpy.Raster(imageFolder + "\\" + band)
-                        elif "band4" in band:
-                            nirBand = arcpy.Raster(imageFolder + "\\" + band)
-                        elif "cfmask.tif" in band:
-                            cloudMaskOrig = arcpy.Raster(imageFolder + "\\" + band)
-                    elif "LT5" in band:
-                        if "band3" in band:
-                            redBand = arcpy.Raster(imageFolder + "\\" + band)
-                        elif "band4" in band:
-                            nirBand = arcpy.Raster(imageFolder + "\\" + band)
-                        elif "cfmask.tif" in band:
-                            cloudMaskOrig = arcpy.Raster(imageFolder + "\\" + band)
-                redBandFloat = arcpy.sa.Float(redBand)
-                nirBandFloat = arcpy.sa.Float(nirBand)
-                print "Calculating NDVI for image: " + image + " : " + redBand.name + " and " + nirBand.name
-                try:
-                    ndviImage = Float(nirBand - redBand)/(nirBand + redBand)
-                    print "image folder and name: ",
-                    print imageFolder + "\\" + bandList[0][:16] + "_NDVI.tif"
-                    ndviImage.save(imageFolder + "\\" + bandList[0][:16] + "_NDVI.tif")
-                except:
-                    errorList = open(errorListLocation, "a")
-                    errorList.write("NDVI calculation fail: " + str(nirBand))
-                    errorList.close()
-
-                # take the mask and create a binary mask to remove all snow, cloud, cloud shadow, and water.
-                # Store the remap values in a variable called remapKey
-                # remapKey = RemapValue([[0,1],[1,"NODATA"],[2,"NODATA"],[3,"NODATA"],[4,"NODATA"]])
-                try:
-                    remapKey = RemapValue([[2,1],[3,1],[4,1]])
-                    cloudMaskBin = Reclassify(cloudMaskOrig, "Value", remapKey) 
-                    print "Creating cloudmask: ",
-                    print cloudMaskBin
+def set_masks():
+    try:
+        for tile in os.listdir(tileFolderRoot):
+            for sensor in os.listdir(os.path.join(tileFolderRoot, tile)):
+                for image in os.listdir(os.path.join(tileFolderRoot, tile, sensor)):
+                    env.workspace = os.path.join(tileFolderRoot, tile, sensor, image)
+                    imageFolder = os.path.join(tileFolderRoot, tile, sensor, image)
+                    bandList = arcpy.ListRasters("*", "TIF")
+                    for band in bandList:
+                        if "LC8" in band:
+                            if "band4" in band:
+                                redBand = arcpy.Raster(imageFolder + "\\" + band)
+                            elif "band5" in band:
+                                nirBand = arcpy.Raster(imageFolder + "\\" + band)
+                            elif "cfmask.tif" in band:
+                                cloudMaskOrig = arcpy.Raster(imageFolder + "\\" + band)
+                        elif "LE7" in band:
+                            if "band3" in band:
+                                redBand = arcpy.Raster(imageFolder + "\\" + band)
+                            elif "band4" in band:
+                                nirBand = arcpy.Raster(imageFolder + "\\" + band)
+                            elif "cfmask.tif" in band:
+                                cloudMaskOrig = arcpy.Raster(imageFolder + "\\" + band)
+                        elif "LT5" in band:
+                            if "band3" in band:
+                                redBand = arcpy.Raster(imageFolder + "\\" + band)
+                            elif "band4" in band:
+                                nirBand = arcpy.Raster(imageFolder + "\\" + band)
+                            elif "cfmask.tif" in band:
+                                cloudMaskOrig = arcpy.Raster(imageFolder + "\\" + band)
+                    redBandFloat = arcpy.sa.Float(redBand)
+                    nirBandFloat = arcpy.sa.Float(nirBand)
+                    print "Calculating NDVI for image: " + image + " : " + redBand.name + " and " + nirBand.name
                     try:
-                        cloudMaskBin.save(cloudMaskOrig.path + cloudMaskOrig.name[:-4] + "_binary.tif")
+                        ndviImage = Float(nirBand - redBand)/(nirBand + redBand)
+                        print "image folder and name: ",
+                        print imageFolder + "\\" + bandList[0][:16] + "_NDVI.tif"
+                        ndviImage.save(imageFolder + "\\" + bandList[0][:16] + "_NDVI.tif")
                     except:
-                        print "Can't create cloudmask for: ",
-                        print str(cloudMaskBin)
-                except:
-                    errorList = open(errorListLocation, "a")
-                    errorList.write("CloudMask fail: " + str(cloudMaskBin))
-                    errorList.close()
-except:
-    errorList = open(errorListLocation, "a")
-    errorList.write("CloudMask fail: " + str(tile))
-    errorList.close()
-    print "Could not process: ",
-    print str(tile)
+                        errorList = open(errorListLocation, "a")
+                        errorList.write("NDVI calculation fail: " + str(nirBand))
+                        errorList.close()
+
+                    # take the mask and create a binary mask to remove all snow, cloud, cloud shadow, and water.
+                    # Store the remap values in a variable called remapKey
+                    # remapKey = RemapValue([[0,1],[1,"NODATA"],[2,"NODATA"],[3,"NODATA"],[4,"NODATA"]])
+                    try:
+                        remapKey = RemapValue([[2,1],[3,1],[4,1]])
+                        cloudMaskBin = Reclassify(cloudMaskOrig, "Value", remapKey)
+                        print "Creating cloudmask: ",
+                        print cloudMaskBin
+                        try:
+                            cloudMaskBin.save(cloudMaskOrig.path + cloudMaskOrig.name[:-4] + "_binary.tif")
+                        except:
+                            print "Can't create cloudmask for: ",
+                            print str(cloudMaskBin)
+                    except:
+                        errorList = open(errorListLocation, "a")
+                        errorList.write("CloudMask fail: " + str(cloudMaskBin))
+                        errorList.close()
+    except:
+        errorList = open(errorListLocation, "a")
+        errorList.write("CloudMask fail: " + str(tile))
+        errorList.close()
+        print "Could not process: ",
+        print str(tile)
 
                 
 # this deletes any previously made rasters, just so no duplicates are made
-def deleteRasters(currentFolder, currentFileList):
+def delete_rasters(currentFolder, currentFileList):
     env.workspace = currentFolder
     tempRasterList = arcpy.ListRasters("*","TIF")
     for rasters in tempRasterList:
@@ -458,106 +465,107 @@ for root, dirs, files in os.walk(tileFolderRoot):
  '''       
     
 # mask the rasters with the cloudmask
-for root, dirs, files in os.walk(tileFolderRoot):
-    try:
-        maskBands(root, files)
-    except:
-        print "Failed to mask images: ",
-        print str(files)
-        errorList = open(errorListLocation, "a")
-        errorList.write("MaskBand failure in: " + str(files))
-        errorList.close()
 
 
-# Extract the study area raw data based on the 2012 quarantine zone shapefile
-# ACTUALLY I CHANGED THIS TO THE DISSOLVED 5 TOWN SA
-for tile in os.listdir(tileFolderRoot):
-    for sensor in os.listdir(os.path.join(tileFolderRoot, tile)):
-        for image in os.listdir(os.path.join(tileFolderRoot, tile, sensor)):
-            try:
+def mask_imgs(img_folder):
+    for root, dirs, files in os.walk(img_folder):
+        try:
+            maskBands(root, files)
+        except:
+            print "Failed to mask images: ",
+            print str(files)
+            errorList = open(errorListLocation, "a")
+            errorList.write("MaskBand failure in: " + str(files))
+            errorList.close()
+
+def extract_sa():
+    # Extract the study area raw data based on the 2012 quarantine zone shapefile
+    # ACTUALLY I CHANGED THIS TO THE DISSOLVED 5 TOWN SA
+    for tile in os.listdir(tileFolderRoot):
+        for sensor in os.listdir(os.path.join(tileFolderRoot, tile)):
+            for image in os.listdir(os.path.join(tileFolderRoot, tile, sensor)):
+                try:
+                    env.workspace = os.path.join(tileFolderRoot, tile, sensor, image)
+                    imageFolder = os.path.join(tileFolderRoot, tile, sensor, image)
+                    bandList = arcpy.ListRasters("*", "TIF")
+                    extractedRaster = ""
+                    fcTownsSA = "D:\\sync\\gis\\Dissertation\\StudyArea\\StudyAreaDatabase.gdb\\SAExtractionPolygon"
+                    # fcQuarZone = "D:\\sync\\gis\\Dissertation\\StudyArea\\StudyAreaDatabase.gdb\\ALBQUarantineWorcester_USDA_20120101"
+                    for band in bandList:
+                        if len(str(band)) > 0 and "None" not in band:
+                            if "_SA" not in band:
+                                if "NDVI_Masked" in band or "B6" in band or "B10" in band:
+                                    extractedRaster = ExtractByMask(band, fcTownsSA)
+                                    extractedRaster.save(str(band)[0:-4] + "_SA.TIF")
+                                    del extractedRaster
+                except:
+                    print "Failed to extract image: ",
+                    print str(image)
+                    errorList = open(errorListLocation, "a")
+                    errorList.write("SA extraction failure in: " + str(image))
+                    errorList.close()
+                
+
+def lst():
+    # Loop through the sorted imagery folders (tiles) and do all the thermal calculations in sequence
+    for tile in os.listdir(tileFolderRoot):
+        for sensor in os.listdir(os.path.join(tileFolderRoot, tile)):
+            for image in os.listdir(os.path.join(tileFolderRoot, tile, sensor)):
                 env.workspace = os.path.join(tileFolderRoot, tile, sensor, image)
                 imageFolder = os.path.join(tileFolderRoot, tile, sensor, image)
-                bandList = arcpy.ListRasters("*", "TIF")
-                extractedRaster = ""
-                fcTownsSA = "D:\\sync\\gis\\Dissertation\\StudyArea\\StudyAreaDatabase.gdb\\SAExtractionPolygon"
-                # fcQuarZone = "D:\\sync\\gis\\Dissertation\\StudyArea\\StudyAreaDatabase.gdb\\ALBQUarantineWorcester_USDA_20120101"
-                for band in bandList:
-                    if len(str(band)) > 0 and "None" not in band:
-                        if "_SA" not in band:
-                            if "NDVI_Masked" in band or "B6" in band or "B10" in band:
-                                extractedRaster = ExtractByMask(band, fcTownsSA)
-                                extractedRaster.save(str(band)[0:-4] + "_SA.TIF")
-                                del extractedRaster
-            except:
-                print "Failed to extract image: ",
-                print str(image)
-                errorList = open(errorListLocation, "a")
-                errorList.write("SA extraction failure in: " + str(image))
-                errorList.close()
-                
-       
-# Loop through the sorted imagery folders (tiles) and do all the thermal calculations in sequence
-for tile in os.listdir(tileFolderRoot):
-    for sensor in os.listdir(os.path.join(tileFolderRoot, tile)):
-        for image in os.listdir(os.path.join(tileFolderRoot, tile, sensor)):
-            env.workspace = os.path.join(tileFolderRoot, tile, sensor, image)
-            imageFolder = os.path.join(tileFolderRoot, tile, sensor, image)
-            os.chdir(imageFolder)
-            metadataFile = ""
-            thermalBand = ""
-            ndviBand = ""
-            fileList = os.listdir(imageFolder)
-            for file in fileList:
-                if "MTL.txt" in file:
-                    metadataFile = file
-                if "LC8" in imageFolder:
-                    bandList = arcpy.ListRasters("*_SA*", "TIF")
-                    for band in bandList:
-                        if "B10_SA" in band and "lSen" not in band and "tSen" not in band and "gamma" not in band and "delta" not in band:
-                            thermalBand = arcpy.Raster(band)
-                        elif "NDVI_Masked_SA" in band and "emis" not in band :
-                            ndviBand = arcpy.Raster(band)
-                elif "LE7" in imageFolder:
-                    bandList = arcpy.ListRasters("*_SA*", "TIF")
-                    for band in bandList:
-                        if "B6_VCID_1_SA" in band and "lSen" not in band and "tSen" not in band and "gamma" not in band and "delta" not in band:
-                            if "VCID_1" in band:
+                os.chdir(imageFolder)
+                metadataFile = ""
+                thermalBand = ""
+                ndviBand = ""
+                fileList = os.listdir(imageFolder)
+                for file in fileList:
+                    if "MTL.txt" in file:
+                        metadataFile = file
+                    if "LC8" in imageFolder:
+                        bandList = arcpy.ListRasters("*_SA*", "TIF")
+                        for band in bandList:
+                            if "B10_SA" in band and "lSen" not in band and "tSen" not in band and "gamma" not in band and "delta" not in band:
                                 thermalBand = arcpy.Raster(band)
-                        elif "NDVI_Masked_SA" in band and "emis" not in band:
-                            ndviBand = arcpy.Raster(band)
-                elif "LT5" in imageFolder:
-                    bandList = arcpy.ListRasters("*_SA*", "TIF")
-                    for band in bandList:
-                        if "B6_SA" in band and "lSen" not in band and "tSen" not in band and "gamma" not in band and "delta" not in band:
-                            thermalBand = arcpy.Raster(band)
-                        elif "NDVI_Masked_SA" in band and "emis" not in band:
-                            ndviBand = arcpy.Raster(band)
-            if len(str(thermalBand)) > 0:
-                if "012030" not in str(thermalBand):
-                    try:
-                        # print "NDVI BAND IS: ",
-                        # print ndviBand
-                        lSenRaster = lSen(imageFolder, thermalBand, metadataFile)
-                        tSenRaster = tSen(imageFolder, lSenRaster)
-                        gammaDeltaList = gammaDelta(imageFolder, tSenRaster, lSenRaster)
-                        emisRaster = emissivity(imageFolder, ndviBand)
-                        waterVapor = w(thermalBand)
-                        psiValues = psi123(radiosoundDict, waterVapor, thermalBand)
-                        print "Calculating lst for : ",
-                        print thermalBand
-                        lstRaster = lst(imageFolder, lSenRaster, gammaDeltaList, emisRaster, psiValues)
-                        # cleanUp(imageFolder)
-                    except arcpy.ExecuteError:
-                        print arcpy.AddError(arcpy.GetMessages(2))
-                        print "Could not calculate LST for: ",
-                        print imageFolder
-                        errorList = open(errorListLocation, "a")
-                        errorList.write("LST calculation fail outside module: " + str(imageFolder))
-                        errorList.close()
-                    
-print "Processing completed: ",
-print datetime.datetime.now()
-endTime = datetime.datetime.now()
-print "Total processing time: ",
-print endTime - startTime
+                            elif "NDVI_Masked_SA" in band and "emis" not in band :
+                                ndviBand = arcpy.Raster(band)
+                    elif "LE7" in imageFolder:
+                        bandList = arcpy.ListRasters("*_SA*", "TIF")
+                        for band in bandList:
+                            if "B6_VCID_1_SA" in band and "lSen" not in band and "tSen" not in band and "gamma" not in band and "delta" not in band:
+                                if "VCID_1" in band:
+                                    thermalBand = arcpy.Raster(band)
+                            elif "NDVI_Masked_SA" in band and "emis" not in band:
+                                ndviBand = arcpy.Raster(band)
+                    elif "LT5" in imageFolder:
+                        bandList = arcpy.ListRasters("*_SA*", "TIF")
+                        for band in bandList:
+                            if "B6_SA" in band and "lSen" not in band and "tSen" not in band and "gamma" not in band and "delta" not in band:
+                                thermalBand = arcpy.Raster(band)
+                            elif "NDVI_Masked_SA" in band and "emis" not in band:
+                                ndviBand = arcpy.Raster(band)
+                if len(str(thermalBand)) > 0:
+                    if "012030" not in str(thermalBand):
+                        try:
+                            # print "NDVI BAND IS: ",
+                            # print ndviBand
+                            lSenRaster = lSen(imageFolder, thermalBand, metadataFile)
+                            tSenRaster = tSen(imageFolder, lSenRaster)
+                            gammaDeltaList = gammaDelta(imageFolder, tSenRaster, lSenRaster)
+                            emisRaster = emissivity(imageFolder, ndviBand)
+                            waterVapor = w(thermalBand)
+                            psiValues = psi123(radiosoundDict, waterVapor, thermalBand)
+                            print "Calculating lst for : ",
+                            print thermalBand
+                            lstRaster = lst(imageFolder, lSenRaster, gammaDeltaList, emisRaster, psiValues)
+                            # cleanUp(imageFolder)
+                        except arcpy.ExecuteError:
+                            print arcpy.AddError(arcpy.GetMessages(2))
+                            print "Could not calculate LST for: ",
+                            print imageFolder
+                            errorList = open(errorListLocation, "a")
+                            errorList.write("LST calculation fail outside module: " + str(imageFolder))
+                            errorList.close()
 
+
+endTime = datetime.datetime.now()
+print("Processing completed: ", datetime.datetime.now(), "Total processing time: ", endTime - startTime)
