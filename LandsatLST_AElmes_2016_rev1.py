@@ -43,13 +43,14 @@ env.workspace = output_folder_root
 
 # list of path/row combos and sensors
 path_row_list = ["012031", "013030", "013031"]  # might add to these if necessary
-sensor_list = ["LT5", "LE7", "LC08"]
+sensor_list = ["LT05", "LE07", "LC08"]
 
 # this is the list of rasters that, for whatever reason, fail to be correctly processed
-error_list_location = "C:\\Data\\Landsat\\ErrorList.txt"
+error_list_location = "C:\\Data\\Landsat\\error_list.txt"
 
 # clear any rasters from previous run
-errorList = open(error_list_location, "w")
+error_list = open(error_list_location, "w")
+error_list.close()
 
 
 # Loop through 'original' folder containing all LC8, LE7, and LT5 scenes from the CDR archive
@@ -70,40 +71,49 @@ def sort_images(lvl1_download_folder, refl_download_folder, refl_out_folder, pr_
             if pr in tile_name:
                 for sns in sns_list:
                     if sns in tile_name:
-                        print tile_name, "is", sns, " and is in", pr
-                        shutil.copytree(os.path.join(refl_download_folder, tile_name), os.path.join(refl_out_folder, pr,
-                                                                                                    sns, tile_name))
-            
+                        print tile_name, "is", sns, "and is in", pr
+                        src_fldr = os.path.join(refl_download_folder, tile_name)
+                        dest_fldr = os.path.join(refl_out_folder, pr, sns, tile_name)
+                        if not os.path.isdir(dest_fldr):
+                            shutil.copytree(src_fldr, dest_fldr)
+                        find_thermal(lvl1_download_folder, dest_fldr)
+
 
 # Find the raw thermal band for each image
-# Loop through all CDR images, and for each one, loop through the LVL1 images, stopping at the matching image, based on name
+# Loop through all CDR images, and for each one, loop through the LVL1 images, stopping at the matching image,
+# based on name
 # Copy that image and paste it in the CDR folder
 
 
-sort_images(lvl1_dl_folder, refl_dl_folder, output_folder_root, path_row_list, sensor_list)
+def find_thermal(lvl1_download_folder, refl_dest_folder):
+    # parse the file name
+    # THIS MAY NEED TO CHANGE, since apparently these conventions change occasionally
+    found = False
+    sensor = refl_dest_folder.split("\\")[6][:4]
+    pathrow = refl_dest_folder.split("\\")[6][4:10]
+    for root, dirs, files in os.walk(lvl1_download_folder):
+        for dir in dirs:
+            if pathrow in dir and sensor in dir:
+                found = True
+                imgs = os.listdir(os.path.join(root, dir))
+                for img in imgs:
+                    if "LC08" in img:
+                        if "B10" in img:
+                            shutil.copy2(os.path.join(root, dir, img), refl_dest_folder)
+                        elif "MTL" in dir:
+                            shutil.copy2(os.path.join(root, dir, img), refl_dest_folder)
+                    elif "LT05" in sensor or "LE07" in sensor:
+                        if "B6" in img or "VCID" in img:
+                            shutil.copy2(os.path.join(root, dir, img), refl_dest_folder)
+                        elif "MTL" in img:
+                            shutil.copy2(os.path.join(root, dir, img), refl_dest_folder)
+    if not found:
+        error_list = open(error_list_location, "a")
+        error_list.write("No thermal image found for: " + str(refl_dest_folder))
+        error_list.close()
 
-def find_thermal():
-    for folder in os.listdir(cdrPathRowFolder):
-        for sensor in os.listdir(os.path.join(cdrPathRowFolder, folder)):
-            for cdrImage in os.listdir(os.path.join(cdrPathRowFolder, folder, sensor)):
-                for root, dirs, files in os.walk(lvl1DownloadFolder):
-                    for lvl1Image in files:
-                        #print cdrImage[:16] + "   " + lvl1Image
-                        if cdrImage[:16] in lvl1Image:
-                            #print cdrImage + " found: " + lvl1Image
-                            if "LC8" in lvl1Image:
-                                if "B10" in lvl1Image:
-                                    print "Moving: " + os.path.join(root, lvl1Image) + " to " + os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image)
-                                    shutil.copy2(os.path.join(root, lvl1Image), os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image))
-                                elif "MTL" in lvl1Image:
-                                    shutil.copy2(os.path.join(root, lvl1Image), os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image))
-                            else:
-                                if "B6" in lvl1Image or "VCID" in lvl1Image:
-                                    print "Moving: " + os.path.join(root, lvl1Image) + " to " + os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image)
-                                    shutil.copy2(os.path.join(root, lvl1Image), os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image))
-                                elif "MTL" in lvl1Image:
-                                    shutil.copy2(os.path.join(root, lvl1Image), os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image))
-                                    print "Moving: " + os.path.join(root, lvl1Image) + " to " + os.path.join(cdrPathRowFolder, folder, cdrImage[0:3], cdrImage, lvl1Image)
+
+sort_images(lvl1_dl_folder, refl_dl_folder, output_folder_root, path_row_list, sensor_list)
 
 
 # iterate through each band in the folder, and assign raster objects to the cloud mask,
@@ -147,9 +157,9 @@ def set_masks():
                         print imageFolder + "\\" + bandList[0][:16] + "_NDVI.tif"
                         ndviImage.save(imageFolder + "\\" + bandList[0][:16] + "_NDVI.tif")
                     except:
-                        errorList = open(errorListLocation, "a")
-                        errorList.write("NDVI calculation fail: " + str(nirBand))
-                        errorList.close()
+                        error_list = open(error_listLocation, "a")
+                        error_list.write("NDVI calculation fail: " + str(nirBand))
+                        error_list.close()
 
                     # take the mask and create a binary mask to remove all snow, cloud, cloud shadow, and water.
                     # Store the remap values in a variable called remapKey
@@ -165,17 +175,17 @@ def set_masks():
                             print "Can't create cloudmask for: ",
                             print str(cloudMaskBin)
                     except:
-                        errorList = open(errorListLocation, "a")
-                        errorList.write("CloudMask fail: " + str(cloudMaskBin))
-                        errorList.close()
+                        error_list = open(error_listLocation, "a")
+                        error_list.write("CloudMask fail: " + str(cloudMaskBin))
+                        error_list.close()
     except:
-        errorList = open(errorListLocation, "a")
-        errorList.write("CloudMask fail: " + str(tile))
-        errorList.close()
+        error_list = open(error_listLocation, "a")
+        error_list.write("CloudMask fail: " + str(tile))
+        error_list.close()
         print "Could not process: ",
         print str(tile)
 
-                
+
 # this deletes any previously made rasters, just so no duplicates are made
 def delete_rasters(currentFolder, currentFileList):
     env.workspace = currentFolder
@@ -228,13 +238,13 @@ def lSen(thermalImageFolder, thermalImage, metaFile):
         try:
             lSenRaster = bias + Raster(thermalImageFolder + "\\" + imageName) * gain
             # print thermalImageFolder + "\\" + imageName[:-4] + "_lSen.TIF"
-            lSenRaster.save(thermalImageFolder + "\\" + imageName[:-4] + "_lSen.TIF")       
+            lSenRaster.save(thermalImageFolder + "\\" + imageName[:-4] + "_lSen.TIF")
             return lSenRaster.path + lSenRaster.name
         except:
-            errorList = open(errorListLocation, "a")
-            errorList.write("lSen: " + str(thermalImage))
-            errorList.close()
-            
+            error_list = open(error_listLocation, "a")
+            error_list.write("lSen: " + str(thermalImage))
+            error_list.close()
+
     return lSenRaster
 
 
@@ -255,9 +265,9 @@ def tSen(lSenRasterFolder, lSenRaster):
             elif "LC8" in radRasterName:
                 k1 = 774.89
                 k2 = 1321.08
-            tSenRaster = k2 / arcpy.sa.Ln(k1 / arcpy.Raster(radRasterName) + 1)       
+            tSenRaster = k2 / arcpy.sa.Ln(k1 / arcpy.Raster(radRasterName) + 1)
             tSenRaster.save(str(lSenRaster)[:-8] + "_tSen.TIF")
-            #print str(lSenRaster)[:-8] + "_tSen.TIF" 
+            #print str(lSenRaster)[:-8] + "_tSen.TIF"
             return tSenRaster.path + tSenRaster.name
             del tSenRaster
             del radRastername
@@ -265,10 +275,10 @@ def tSen(lSenRasterFolder, lSenRaster):
         print arcpy.AddError(arcpy.GetMessages(2))
         print "Could not calculate tSen for: ",
         print lSenRaster
-        errorList = open(errorListLocation, "a")
-        errorList.write("tSen calculation fail: " + str(lSenRaster))
-        errorList.close()
-        
+        error_list = open(error_listLocation, "a")
+        error_list.write("tSen calculation fail: " + str(lSenRaster))
+        error_list.close()
+
 def gammaDelta(currentFolder, tSenRaster, lSenRaster):
     try:
         env.workspace = currentFolder
@@ -296,10 +306,10 @@ def gammaDelta(currentFolder, tSenRaster, lSenRaster):
         print arcpy.AddError(arcpy.GetMessages(2))
         print "Could not calculate Gamma and Delta for: ",
         print lSenRaster
-        errorList = open(errorListLocation, "a")
-        errorList.write("gamma or delta calculation fail: " + str(lSenRaster))
-        errorList.close()
-        
+        error_list = open(error_listLocation, "a")
+        error_list.write("gamma or delta calculation fail: " + str(lSenRaster))
+        error_list.close()
+
 def emissivity(currentFolder, ndvi):
     # print "Calculating emissivity for: ",
     # print ndvi
@@ -327,7 +337,7 @@ def emissivity(currentFolder, ndvi):
             # This should yeild three interlocking rasters, which can just be added together for final emissivity.
             vegEmisRst = arcpy.sa.Con(ndviRasterName, 0.99, 0, "VALUE >= 0.5")
             soilEmisRst = arcpy.sa.Con(ndviRasterName, 0.973, 0, "VALUE <= 0.2")
-            mixedEmisRst = arcpy.sa.Con(ndviRasterName, 0.004 * arcpy.sa.Power((Raster(ndviRasterName) - 0.2/0.5-0.2),2) + 0.986, 0, "VALUE > 0.2 AND VALUE < 0.5")   
+            mixedEmisRst = arcpy.sa.Con(ndviRasterName, 0.004 * arcpy.sa.Power((Raster(ndviRasterName) - 0.2/0.5-0.2),2) + 0.986, 0, "VALUE > 0.2 AND VALUE < 0.5")
             combinedEmisRst = mixedEmisRst + soilEmisRst + vegEmisRst
             # combinedEmisRst = combinedEmisRst * maskBand
             combinedEmisRst = arcpy.sa.Con(maskBand, combinedEmisRst, -999, "value = 0")
@@ -339,9 +349,9 @@ def emissivity(currentFolder, ndvi):
         print arcpy.AddError(arcpy.GetMessages(2))
         print "Could not calculate emissivity for: ",
         print currentFolder
-        errorList = open(errorListLocation, "a")
-        errorList.write("emissivity calculation fail, substituted placeHolderRst: " + str(ndvi))
-        errorList.close()
+        error_list = open(error_listLocation, "a")
+        error_list.write("emissivity calculation fail, substituted placeHolderRst: " + str(ndvi))
+        error_list.close()
         placeHolderRst = arcpy.Raster("G:\\Data\\Dissertation\\LandsatDataWorcester\\PlaceHolderRaster\\PlaceHolder_AllNoData.tif")
         # placeHolderRst.save(os.path.join(currentFolder, currentFolder[-33:-17] + "_emissivity_SA.TIF"))
         imageNameList = currentFolder.split(os.sep)
@@ -358,7 +368,7 @@ def w(currentImage):
     imageDate = str(currentImage)[9:16]
     relHum = 0.0
     with open(r"D:\sync\gis\Dissertation\scripts\Thermal\WeatherDataWorcester.csv", "rb") as csvfile:
-       dataReader = csv.reader(csvfile) 
+       dataReader = csv.reader(csvfile)
        for row in dataReader:
            if imageDate in row:
                relHum = float(row[3]) * 0.01
@@ -404,9 +414,9 @@ def lst(currentFolder, lSenRaster, gammaDeltaList, emisRaster, psiValues):
     except:
         print "Could not calculate lst for: ",
         print lSenRaster
-        errorList = open(errorListLocation, "a")
-        errorList.write("LST calculation fail within module: " + str(lSenRaster))
-        errorList.close()
+        error_list = open(error_listLocation, "a")
+        error_list.write("LST calculation fail within module: " + str(lSenRaster))
+        error_list.close()
 
 
 # Mask the lst and NDVI images
@@ -459,11 +469,11 @@ for root, dirs, files in os.walk(tileFolderRoot):
     except:
         print "Failed to delete rasters in: ",
         print str(root)
-        errorList = open(errorListLocation, "a")
-        errorList.write("File deletion failure in: " + str(root))
-        errorList.close()
+        error_list = open(error_listLocation, "a")
+        error_list.write("File deletion failure in: " + str(root))
+        error_list.close()
  '''       
-    
+
 # mask the rasters with the cloudmask
 
 
@@ -474,9 +484,9 @@ def mask_imgs(img_folder):
         except:
             print "Failed to mask images: ",
             print str(files)
-            errorList = open(errorListLocation, "a")
-            errorList.write("MaskBand failure in: " + str(files))
-            errorList.close()
+            error_list = open(error_listLocation, "a")
+            error_list.write("MaskBand failure in: " + str(files))
+            error_list.close()
 
 def extract_sa():
     # Extract the study area raw data based on the 2012 quarantine zone shapefile
@@ -501,10 +511,10 @@ def extract_sa():
                 except:
                     print "Failed to extract image: ",
                     print str(image)
-                    errorList = open(errorListLocation, "a")
-                    errorList.write("SA extraction failure in: " + str(image))
-                    errorList.close()
-                
+                    error_list = open(error_listLocation, "a")
+                    error_list.write("SA extraction failure in: " + str(image))
+                    error_list.close()
+
 
 def lst():
     # Loop through the sorted imagery folders (tiles) and do all the thermal calculations in sequence
@@ -562,9 +572,9 @@ def lst():
                             print arcpy.AddError(arcpy.GetMessages(2))
                             print "Could not calculate LST for: ",
                             print imageFolder
-                            errorList = open(errorListLocation, "a")
-                            errorList.write("LST calculation fail outside module: " + str(imageFolder))
-                            errorList.close()
+                            error_list = open(error_listLocation, "a")
+                            error_list.write("LST calculation fail outside module: " + str(imageFolder))
+                            error_list.close()
 
 
 endTime = datetime.datetime.now()
